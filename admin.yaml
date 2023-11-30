@@ -11,11 +11,19 @@ metadata:
 rules:
 - apiGroups: ["*"] # "" indicates the core API group
   resources: ["*"]
-  verbs: ["*"]    # actions on resources, CRUD operations
+  verbs: ["*"] # actions on resources, create, read, update, delete
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-# This role binding allows "jane" to read pods in the "default" namespace.
-# You need to already have a Role named "pod-reader" in that namespace.
+kind: ClusterRole
+metadata:
+  # "namespace" omitted since ClusterRoles are not namespaced
+  name: roboshop-cluster-reader
+rules:
+- apiGroups: ["v1","apps/v1",""]
+  resources: ["secrets","nodes","namespaces","persistentvolumes"]
+  verbs: ["get", "watch", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: roboshop-admin
@@ -30,3 +38,38 @@ roleRef:
   kind: Role #this must be Role or ClusterRole
   name: roboshop-admin # this must match the name of the Role or ClusterRole you wish to bind to
   apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+# This cluster role binding allows anyone in the "manager" group to read secrets in any namespace.
+kind: ClusterRoleBinding
+metadata:
+  name: roboshop-cluster-reader
+subjects:
+- kind: User
+  name: kashi # Name is case sensitive
+  apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole
+  name: roboshop-cluster-reader
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: v1
+data:
+  mapRoles: |
+    - groups:
+      - system:bootstrappers
+      - system:nodes
+      rolearn: arn:aws:iam::127147268179:role/eksctl-eks-spot-cluster-nodegroup--NodeInstanceRole-HwqWaqjWK30Z
+      username: system:node:{{EC2PrivateDNSName}}
+  mapUsers: |
+    - groups:
+      - roboshop-admin
+      userarn: arn:aws:iam::127147268179:user/kashi
+      username: kashi
+kind: ConfigMap
+metadata:
+  creationTimestamp: "2023-11-21T01:43:14Z"
+  name: aws-auth
+  namespace: kube-system
+  resourceVersion: "8642"
+  uid: 94eacb41-7c0a-4038-91cf-d6ad800e1867
